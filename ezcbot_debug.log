@@ -1,0 +1,26 @@
+2019-05-07 11:00:12,652 : INFO : start.py : 35 : <module>() : __main__ : Starting ezcapechat client.
+2019-05-07 11:00:16,904 : DEBUG : web.py : 127 : get() : util.web : url: https://www.ezcapechat.com/rooms/test
+2019-05-07 11:00:16,911 : DEBUG : connectionpool.py : 813 : _new_conn() : urllib3.connectionpool : Starting new HTTPS connection (1): www.ezcapechat.com:443
+2019-05-07 11:00:17,803 : DEBUG : connectionpool.py : 393 : _make_request() : urllib3.connectionpool : https://www.ezcapechat.com:443 "GET /rooms/test HTTP/1.1" 200 None
+2019-05-07 11:00:17,808 : CRITICAL : ezcbot.py : 122 : connect() : ezcbot : flash vars len: 0 flash vars: []
+Traceback (most recent call last):
+  File "/home/damian/ezcbot/ezcbot.py", line 87, in connect
+    n_key=self._pub_n_key, proxy=self.proxy)
+  File "/home/damian/ezcbot/apis/ezcapechat.py", line 48, in __init__
+    self._set_flash_vars()
+  File "/home/damian/ezcbot/apis/ezcapechat.py", line 244, in _set_flash_vars
+    (len(self._flash_vars), self._flash_vars))
+MissingFlashVarsError: flash vars len: 0 flash vars: []
+2019-05-07 11:00:26,485 : INFO : start.py : 35 : <module>() : __main__ : Starting ezcapechat client.
+2019-05-07 11:00:30,112 : DEBUG : web.py : 127 : get() : util.web : url: https://www.ezcapechat.com/rooms/omg
+2019-05-07 11:00:30,119 : DEBUG : connectionpool.py : 813 : _new_conn() : urllib3.connectionpool : Starting new HTTPS connection (1): www.ezcapechat.com:443
+2019-05-07 11:00:30,806 : DEBUG : connectionpool.py : 393 : _make_request() : urllib3.connectionpool : https://www.ezcapechat.com:443 "GET /rooms/omg HTTP/1.1" 200 None
+2019-05-07 11:00:30,814 : DEBUG : web.py : 180 : post() : util.web : url: https://www.ezcapechat.com/php/ajax/join_room.php?n=c78f9db75dfa71c851ff0c4f1767d739, post_data: <MultipartEncoder: {'username': u'OMGYES', 'user_id': u'0', 'room_name': u'omg', 't1': u'3638297e68058a16071a272026d5e2a11f3ccccad747c0eb27d883a75bbfbd00'}>
+2019-05-07 11:00:31,329 : DEBUG : connectionpool.py : 393 : _make_request() : urllib3.connectionpool : https://www.ezcapechat.com:443 "POST /php/ajax/join_room.php?n=c78f9db75dfa71c851ff0c4f1767d739 HTTP/1.1" 200 None
+2019-05-07 11:00:31,563 : CRITICAL : ezcbot.py : 122 : connect() : ezcbot : '_socketobject' object has no attribute 'ioctl'
+Traceback (most recent call last):
+  File "/home/damian/ezcbot/ezcbot.py", line 118, in connect
+    False                   # disabled(flash_vars[0]) ?
+  File "/home/damian/ezcbot/rtmplib/rtmp.py", line 258, in connect
+    self.socket.ioctl(socket.SIO_KEEPALIVE_VALS, (1, 10000, 3000))
+AttributeError: '_socketobject' object has no attribute 'ioctl'

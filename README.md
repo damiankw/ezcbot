@@ -1,6 +1,6 @@
-## Ezclib
+## EZCBOT
 
-An experimental library for ezcapechat.
+A bot created out of boredom, based off of an experimental library for ezcapechat ezclib by [nortxort](https://github.com/nortxort).
 
 ## Requirements
 - [requests](https://github.com/requests/requests)
@@ -8,7 +8,8 @@ An experimental library for ezcapechat.
 - [pyamf](https://github.com/hydralabs/pyamf)
 
 ## Author
-* [nortxort](https://github.com/nortxort)
+* [damiankw](https://github.com/damiankw)
+% based from [nortxort](https://github.com/nortxort) original
 
 
 ## License

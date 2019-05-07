@@ -1,4 +1,3 @@
-""" Ezcapechat RTMP library by Nortxort (https://github.com/nortxort) """
 import json
 import logging
 import time
@@ -10,22 +9,21 @@ from pages import acc
 from util import string_util
 from rtmplib import rtmp
 
-__version__ = '1.1.0'
+__version__ = '2.0.0'
 log = logging.getLogger(__name__)
 CONFIG = config
 
 
-class EzcapechatRTMPProtocol:
-    """
-    Ezcapechat RTMP protocol.
+class EZCBOT:
+    def __init__(self, room, username, email=None, password=None, proxy=None):
+        # EZCBOT(<room name>, <user name>, <email address>, <password>, <proxy>)
+        # creates the BOT instance and collates data for use locally
 
-    Contains event methods in use by the flash application.
-    """
-    def __init__(self, room_name, username, email=None, password=None, proxy=None):
+
         """
         Initialize the ezcapechat protocol class.
 
-        :param room_name: The room name.
+        :param room: The room name.
         :type room_name: str
         :param username: A user name.
         :type username: str
@@ -36,7 +34,8 @@ class EzcapechatRTMPProtocol:
         :param proxy: Use a proxy.
         :type proxy: str
         """
-        self.room_name = u'' + room_name
+        
+        self.room_name = u'' + room
         self.email = email
         self.password = password
         self.proxy = proxy
