@@ -1,6 +1,12 @@
 import json
 import logging
 import time
+import os
+import uuid
+import threading
+import sys
+import random
+import sqlite3
 
 import config
 import user
@@ -9,62 +15,76 @@ from pages import acc
 from util import string_util
 from rtmplib import rtmp
 
+sys.path.insert(0, 'util')
+from string_util import *
+
 __version__ = '2.0.0'
 log = logging.getLogger(__name__)
 CONFIG = config
 
 
 class EZCBOT:
+    # EZCBOT(<room name>, <user name>, [<email address>], [<password>], [<proxy>])
+    # creates the BOT instance and collates data for use locally
     def __init__(self, room, username, email=None, password=None, proxy=None):
-        # EZCBOT(<room name>, <user name>, <email address>, <password>, <proxy>)
-        # creates the BOT instance and collates data for use locally
+        # default configuration for local variables
+        self.room_name = u'' + room        # the room we live in
+        self.email = email                 # the authorised email address
+        self.password = password           # the password for email address
+        self.proxy = proxy                 # our proxy account
 
+        self.connection = None             # the connection socket
+        self.is_connected = False          # whether or not we are connected
 
-        """
-        Initialize the ezcapechat protocol class.
-
-        :param room: The room name.
-        :type room_name: str
-        :param username: A user name.
-        :type username: str
-        :param email: Login email.
-        :type email: str
-        :param password: Login password.
-        :type password: str
-        :param proxy: Use a proxy.
-        :type proxy: str
-        """
+        self.users = user.Users()          # a collection of users in the room
+        self.users.add_client(username)    # add ourself
         
-        self.room_name = u'' + room
-        self.email = email
-        self.password = password
-        self.proxy = proxy
+        
+        self.db = sqlite3.connect(config.DBFILE)
+        self.query = self.db.cursor()
+        self.check_database();
+        
+        
+        self.autogreet = {}
+        self._pub_n_key = None
+        self._room_id = 0
+        self._msg_counter = 1
+        self._mimic_user = ""
 
-        self.connection = None
-        self.is_connected = False
 
-        self.users = user.Users()
-        self.users.add_client(username)
+    # check_database()
+    # checks to see if the database exists, create if it doesnt
+    def check_database(self):
+        # check if we have the correct number of tables
+        self.query.execute("SELECT COUNT(name) FROM sqlite_master WHERE name LIKE 'ezc_%'")
+        rows = self.query.fetchone()[0]
+        if (rows == 0):
+            print "WARNING: No tables found, creating database ..."
+            print "- creating autogreet."
+            self.query.execute("CREATE TABLE ezc_autogreet (nick VARCHAR(200), value TEXT, when_updated DATETIME, who_updated VARCHAR(200))")
+            print "- creating users."
+            self.query.execute("CREATE TABLE ezc_users (user VARCHAR(200), level INT, created DATETIME, when_updated DATETIME, who_updated VARCHAR(200))")
+            print "- creating stats."
+            self.query.execute("CREATE TABLE ezc_stats (nick VARCHAR(200), event VARCHAR(10), args TEXT, created DATETIME)")
 
+        elif (rows < 3):
+            print "ERROR: Database does not have all of the required tables, this can't be fixed."
+            quit()
+        
+        
+        
+        
+    
+    # _reset()
+    # resets core variables, ready for reconnect
+    def _reset(self):
         self._pub_n_key = None
         self._room_id = 0
         self._msg_counter = 1
 
-    def _reset(self):
-        """
-
-        """
-        self._pub_n_key = None  # consider this
-        self._room_id = 0
-        self._msg_counter = 1
-
+    # login()
+    # sends login commands to the server for the email/password combination
     def login(self):
-        """
-        Login to ezcapechat using the provided credentials.
-
-        :return: True if logged in, else False.
-        :rtype: bool
-        """
         account = acc.Account(self.email, self.password)
         if self.email and self.password:
             if account.is_logged_in:
@@ -75,17 +95,28 @@ class EZCBOT:
             return account.is_logged_in
         return False
 
+    # connect()
+    # connect to the remote server
     def connect(self):
-        """ Connect to the remote server. """
+        # set up our error checking
         _error = None
 
+        # no idea what why this is done
         if not self.users.client.nick.strip():
             self.users.client.nick = string_util.create_random_string(6, 25)  # adjust length
 
         try:
+            # check if we are on Windows (nt) or Linux/UNIX/BSD (posix), etc
+            if (os.name == "nt"):
+                _is_win = True
+            else:
+                _is_win = False
+            
+            # configure the ezcapechat API
             params = ezcapechat.Params(self.room_name, self.users.client.nick,
                                        n_key=self._pub_n_key, proxy=self.proxy)
 
+            # configure the RtmpClient
             self.connection = rtmp.RtmpClient(
                 ip=params.ip,
                 port=params.port,
@@ -94,9 +125,10 @@ class EZCBOT:
                 swf_url=params.swf_url,
                 page_url=params.page_url,
                 proxy=self.proxy,
-                is_win=True         # delete/set to false if not on windows
+                is_win=_is_win         # delete/set to false if not on windows
             )
 
+            # connect to the remote server
             self.connection.connect(
                 [
                     u'connect',             # application connect string?
@@ -108,10 +140,8 @@ class EZCBOT:
                     u'',                    # ?
                     u'',                    # ?
                     self.room_name,         # room name
-                                            # value of guid (Local Shared Object)
-                    u'A62E0786-7113-2F6F-9C14-6602B02F1872-A7F34D64-C322-314C-642F-B045CF448907',
-                                            # ?
-                    u'68F234E8-4070-59B7-0D9A-CAE4A8D33539-1BFE74C1-C98E-2834-3A85-BFA16CF4C032',
+                    u'' + str(uuid.uuid4()).upper() + '-' + str(uuid.uuid4()).upper(), # local guid (meant to be system wide, but oh well)
+                    u'' + str(uuid.uuid4()).upper() + '-' + str(uuid.uuid4()).upper(), # unknown guid
                     u'0.33',                # protocol version
                     u'',                    # room password
                     u'',                    # ?
@@ -322,6 +352,10 @@ class EZCBOT:
             _user = self.users.add(data[3], user_data)
             print ('%s Joined the room.' % _user.nick)
 
+            #BOT
+            if (_user.nick.lower() in self.autogreet):
+                self.send_public("%s, %s" % (_user.nick, self.autogreet[_user.nick.lower()]))
+
     def on_send_userlist(self, data):
         """
 
@@ -381,6 +415,17 @@ class EZCBOT:
         """
         print ('%s: %s' % (user_name, msg))
 
+        # check if there's a command
+        if (msg[:1] == CONFIG.CMD):
+            try:
+                # throw the command to its own user_<cmd> in a thread, in case it takes a while
+                cmd = threading.Thread(target = eval("self.user_%s" % lindex(msg, 0)[1:]), args = (user_name, lrange(msg, 1, -1)))
+                cmd.start()
+            except AttributeError as ex:
+                print ("ERROR: " + str(ex))
+        elif (user_name.lower() == self._mimic_user.lower()):
+            self.send_public(msg)
+
     def on_typing_pm(self, data):
         """
         Received when a user is writing a private message to the client.
@@ -402,6 +447,17 @@ class EZCBOT:
         # data[6] = msg color
         # data[7] = ?
         print ('[PM] %s: %s' % (data[3], data[5]))
+        
+        try:
+            # throw the command to its own user_<cmd> in a thread, in case it takes a while
+            if (lindex(data[5], 0).lower() == "help"):
+                cmd = threading.Thread(target = eval("self.user_%s" % lindex(data[5], 0)), args = (lrange(data[5], 1, -1)))
+                cmd.start()
+            elif ("has disabled pm" in data[5]):
+                self.send_public("Invalid request: Unable to PM %s, PM disabled." % data[3])
+        except AttributeError as ex:
+            print ("ERROR: " + str(ex))
+
 
     def on_removeuser(self, username):
         """
@@ -465,13 +521,9 @@ class EZCBOT:
             ]
         )
 
+    # send_public(<message>)
+    # sends a public message to the room
     def send_public(self, msg):
-        """
-
-
-        :param msg:
-        :type msg:
-        """
         self.connection.call(
             'send_public',
             [
@@ -480,12 +532,31 @@ class EZCBOT:
                 self.users.client.nick,
                 msg,
                 '0',
-                '#dddddd',         # text color.
-                '3',               # text sizes (0,1,2 or 3)
+                '#87D37C',         # text color.
+                '1',               # text sizes (0,1,2 or 3)
                 self._msg_counter  # message counter.
             ]
         )
 
+    # send_private(<nickname>, <message>)
+    # sends a private message to someone in the room
+    def send_private(self, nick, msg):
+        self.connection.call(
+            'pm',
+            [
+                self._room_id,
+                self.users.client.key,
+                self.users.client.nick,
+                nick,
+                msg,
+                '#87D37C',         # text color.
+                '1',               # text sizes (0,1,2 or 3)
+                self._msg_counter  # message counter.
+            ]
+        )
+
+    # send_secure_message(<message>)
+    # assume this sends a secure message to the room
     def send_secure_message(self, msg):
         self.connection.call(
             'secure_message',
@@ -526,8 +597,9 @@ class EZCBOT:
             ]
         )
 
-    def send_change_topic(self, new_topic):
-        # based on the info from the decompiled SWF.
+    # send_topic(<new topic>)
+    # updates the topic in the room
+    def send_topic(self, new_topic):
         self.connection.call(
             'change_topic',
             [
@@ -537,3 +609,68 @@ class EZCBOT:
                 new_topic
             ]
         )
+        
+    def send_kick(self, user):
+        self.connection.call(
+            'kick',
+            [
+                self._room_id,
+                self.users.client.key,
+                self.users.client.nick,
+                user
+            ]
+        )
+
+
+
+    def user_help(self, user, text):
+        if (text == ""):
+            self.send_private(user, "Here is a list of current commands. For further information use " + CONFIG.CMD + "help <command>")
+            self.send_private(user, "leaderboard, stats, greet, kick, ban, topic, mimic")
+        elif (text.lower() == "leaderboard"):
+            self.send_private(user, CONFIG.CMD + "leaderboard will show you the current top talkers in the room.")
+        elif (text.lower() == "stats"):
+            self.send_private(user, CONFIG.CMD + "stats will show you user statistics from the channel including join, part, kick, lines and words.")
+        elif (text.lower() == "greet"):
+            self.send_private(user, CONFIG.CMD + "autogreet <nickname> <message> will set a new greeting for a user when they join, leave blank to delete.")
+        elif (text.lower() == "kick"):
+            self.send_private(user, CONFIG.CMD + "kick <nickname> will kick the user from the room.")
+        elif (text.lower() == "ban"):
+            self.send_private(user, CONFIG.CMD + "ban <nickname> will ban a user from the room.")
+        elif (text.lower() == "topic"):
+            self.send_private(user, CONFIG.CMD + "topic <new topic> will change the channel topic.")
+        elif (text.lower() == "mimic"):
+            self.send_private(user, CONFIG.CMD + "mimic <nickname> will mimic everything they say.")
+        elif (text.lower() == "titties"):
+            self.send_private(user, CONFIG.CMD + "titties will pull a random image from Google ;)")
+        
+
+    def user_autogreet(self, user, text):
+        self.autogreet[lindex(text, 0).lower()] = lrange(text, 1, -1)
+        self.send_public("%s, %s's greeting has now been set to: %s" % (user, lindex(text, 0), lrange(text, 1, -1)))
+        write("autogreet.txt", "%s - %s > %s" % (user, lindex(text, 0), lrange(text, 1, -1)))
+        
+    def user_titties(self, user, text):
+        url = {"https://bustliftcream.com/wp-content/uploads/2018/11/nudecoveringbreasts.png", "http://cdn.hornybank.com/6/072/22263712/16.jpg", "http://www.big-teen-tits.com/wp-content/uploads/sites/17/2018/02/bigteentits-jade-ftvgirls.jpg", "http://cdn.perfecttitsporn.com/2018-09-15/559939_14.jpg", "http://cdn.hotnakedgirls.net/2017-11-10/483578_10.jpg", "http://cdn1.teennudegirls.com/f0/e/f0e87a48e.jpg", "https://cdn.bignicetits.com/2017-11-11/470147_04.jpg"}
+        self.send_public("I found this for you %s: %s" % (user, random.choice(list(url))))
+        
+    def user_cmd(self, user, text):
+        self.send_cmd(text)
+        
+    def user_msg(self, user, text):
+        self.send_private(user, text)
+        
+    def user_topic(self, user, text):
+        self.send_topic(text)
+        
+    # !mimic <username>
+    def user_mimic(self, user, text):
+        if (lindex(text, 0).lower() == "off"):
+            self._mimic_user = ""
+            self.send_public("Cancelled.")
+        else:
+            self._mimic_user = lindex(text, 0)
+            self.send_public("Following %s" % lindex(text, 0))
+    
+    def user_kick(self, user, text):
+        self.send_kick(text)

@@ -56,3 +56,38 @@ def convert_to_seconds(duration):
         except ValueError:
             return 0
     return seconds
+
+def lrange(text, first, last):
+  # lrange("hello there bitch", 1, -1) = "there bitch"
+  
+  # split up the text
+  text = text.split(" ")
+  
+  # this is the new array and the counter
+  newtext = []
+  i = 0
+  
+  # get rid of any spaces
+  for word in text: # loop through all words
+    if (i >= first) and ((i <= last) or (last == -1)):
+      newtext.append(str(word))
+    if word: # if it's an actual word and not ""
+      i += 1
+  
+  # return the output
+  return " ".join(newtext).strip()
+
+def lindex(text, num):
+  # lindex("hello there bitch", 1) = "there"
+  
+  # split the text up
+  text = text.split(" ")
+  newtext = []
+  
+  # get rid of any spaces
+  for word in text:
+    if word:
+      newtext.append(str(word))
+      
+  # return the output
+  return newtext[num]
